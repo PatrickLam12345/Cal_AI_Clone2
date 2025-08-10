@@ -1,8 +1,4 @@
-// server/routes/usda.route.js
 import express from "express";
-// If Node < 18, uncomment to polyfill fetch:
-// import fetch from "node-fetch";
-
 const router = express.Router();
 const USDA_API_KEY = process.env.USDA_API_KEY;
 const BASE = "https://api.nal.usda.gov/fdc/v1";
@@ -18,35 +14,63 @@ router.get("/search", async (req, res) => {
     if (!q) return res.json({ foods: [], page: 1, pageSize, totalHits: 0 });
 
     // Try Foundation first
-    const foundation = await searchRaw(q, { page, dataType: "Foundation", pageSize });
+    const foundation = await searchRaw(q, { page, dataType: "Foundation", pageSize, sortBy: "relevance",
+    });
     let foods = Array.isArray(foundation.foods) ? foundation.foods : [];
     let totalHits =
       typeof foundation.totalHits === "number" ? foundation.totalHits : (foods.length || 0);
 
     // Fallback to SR Legacy if Foundation empty
     if (foods.length === 0) {
-      const legacy = await searchRaw(q, { page, dataType: "SR Legacy", pageSize });
+      const legacy = await searchRaw(q, { page, dataType: "SR Legacy", pageSize, sortBy: "relevance" });
       foods = Array.isArray(legacy.foods) ? legacy.foods : [];
       totalHits =
         typeof legacy.totalHits === "number" ? legacy.totalHits : (foods.length || 0);
     }
 
-    // Map to compact shape (matches your original client)
     const compact = foods.map((f) => {
-      const { calories } = safeCaloriesForListRow(f);
-      const unitText = safeServingText(f);
+      const { calories, per } = listRowCaloriesAndPer(f);
+      const unitText = servingTextForDisplay(f, per);
       return {
         fdcId: f?.fdcId,
         name: String(f?.description || "Unknown"),
-        calories,        // per serving when we can compute, else per 100 g or 0
-        unit: unitText,  // "150 g", "1 cup", or "serving"
+        calories,
+        unit: unitText,
         dataType: f?.dataType || "",
         brandName: f?.brandName || null,
         gtinUpc: f?.gtinUpc || null,
       };
     });
 
-    res.json({ foods: compact, page, pageSize, totalHits });
+    // Sort results to prioritize exact matches and better relevance
+    const sortedFoods = compact.sort((a, b) => {
+      const queryLower = q.toLowerCase();
+      const aNameLower = a.name.toLowerCase();
+      const bNameLower = b.name.toLowerCase();
+      
+      // Exact match gets highest priority
+      const aExact = aNameLower === queryLower;
+      const bExact = bNameLower === queryLower;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      
+      // Starts with query gets second priority
+      const aStartsWith = aNameLower.startsWith(queryLower);
+      const bStartsWith = bNameLower.startsWith(queryLower);
+      if (aStartsWith && !bStartsWith) return -1;
+      if (!aStartsWith && bStartsWith) return 1;
+      
+      // Contains query gets third priority
+      const aContains = aNameLower.includes(queryLower);
+      const bContains = bNameLower.includes(queryLower);
+      if (aContains && !bContains) return -1;
+      if (!aContains && bContains) return 1;
+      
+      // If both have same match level, sort alphabetically
+      return aNameLower.localeCompare(bNameLower);
+    });
+
+    res.json({ foods: sortedFoods, page, pageSize, totalHits });
   } catch (e) {
     console.error("[/usda/search] error:", e);
     res.status(500).json({ error: "usda-search-failed" });
@@ -96,13 +120,14 @@ async function fetchJson(url, opts = {}, ms = 8000) {
   }
 }
 
-async function searchRaw(query, { page = 1, dataType, pageSize = 25 } = {}) {
+async function searchRaw(query, { page = 1, dataType, pageSize = 25, sortBy } = {}) {
   const url = new URL(`${BASE}/foods/search`);
   url.searchParams.set("api_key", USDA_API_KEY);
   url.searchParams.set("query", query);
   url.searchParams.set("pageNumber", String(page));
   url.searchParams.set("pageSize", String(pageSize));
   if (dataType) url.searchParams.set("dataType", dataType);
+  if (sortBy) url.searchParams.set("sortBy", sortBy);
 
   const r = await fetchJson(url);
   if (!r.ok) throw new Error(`USDA search failed: ${r.status}`);
@@ -116,79 +141,150 @@ async function getDetail(fdcId) {
   return r.json();
 }
 
-// Pull "Energy" from search item; handle kcal or kJ
-function energyFromSearchItemKcal(f) {
-  const arr = Array.isArray(f?.foodNutrients) ? f.foodNutrients : [];
-  const kcalHit = arr.find((n) => {
-    const name = (n?.nutrientName || n?.nutrient?.name || "").toLowerCase();
-    const unit = (n?.unitName || n?.nutrient?.unitName || "").toLowerCase();
-    return name === "energy" && unit === "kcal";
-  });
-  if (typeof kcalHit?.value === "number") return kcalHit.value;
-  if (typeof kcalHit?.amount === "number") return kcalHit.amount;
+/* -------- Robust energy + serving extraction across datasets -------- */
 
-  const kjHit = arr.find((n) => {
-    const name = (n?.nutrientName || n?.nutrient?.name || "").toLowerCase();
-    const unit = (n?.unitName || n?.nutrient?.unitName || "").toLowerCase();
-    return name === "energy" && unit === "kj";
-  });
-  const v =
-    typeof kjHit?.value === "number"
-      ? kjHit.value
-      : typeof kjHit?.amount === "number"
-      ? kjHit.amount
-      : null;
-  if (typeof v === "number" && v > 0) return v / 4.184;
+function readNutrient(n) {
+  return {
+    id: n?.nutrient?.id ?? n?.nutrientId ?? null,
+    num: (n?.nutrient?.number ?? n?.nutrientNumber ?? "").toString(),
+    name: (n?.nutrient?.name ?? n?.nutrientName ?? "").toString().toLowerCase(),
+    unit: (n?.nutrient?.unitName ?? n?.unitName ?? "").toString().toLowerCase(),
+    val:
+      typeof n?.amount === "number"
+        ? n.amount
+        : typeof n?.value === "number"
+        ? n.value
+        : null,
+  };
+}
+
+function getNutrientVal(f, matcher) {
+  const arr = Array.isArray(f?.foodNutrients) ? f.foodNutrients : [];
+  for (const n of arr) {
+    const r = readNutrient(n);
+    if (matcher(r)) return r.val;
+  }
+  return null;
+}
+
+// kcal direct if present, else 0
+function energyKcalFromAny(f) {
+  // id 1008 (Energy kcal)
+  let v = getNutrientVal(f, (r) => r.id === 1008 && typeof r.val === "number" && r.val > 0);
+  if (typeof v === "number") return v;
+
+  // legacy number "208"
+  v = getNutrientVal(f, (r) => r.num === "208" && typeof r.val === "number" && r.val > 0);
+  if (typeof v === "number") return v;
+
+  // name/unit "energy"/"kcal"
+  v = getNutrientVal(f, (r) => r.name === "energy" && r.unit === "kcal" && typeof r.val === "number" && r.val > 0);
+  if (typeof v === "number") return v;
+
+  // kJ → kcal
+  v = getNutrientVal(f, (r) => r.name === "energy" && r.unit === "kj" && typeof r.val === "number" && r.val > 0);
+  if (typeof v === "number") return v / 4.184;
+
   return 0;
 }
 
-// Best-effort calories for list row
-function safeCaloriesForListRow(f) {
-  try {
-    const ln = f?.labelNutrients;
-    const labelCals = ln?.calories?.value;
-    if (typeof labelCals === "number" && labelCals > 0) {
-      return { calories: Math.round(labelCals) }; // Branded per serving
-    }
+// Compute kcal from macros (general Atwater): 4/9/4/7
+function energyKcalFromMacros(f) {
+  const arr = Array.isArray(f?.foodNutrients) ? f.foodNutrients : [];
+  if (!arr.length) return 0;
 
-    const energyPer100g = energyFromSearchItemKcal(f); // Foundation/SR per 100 g
+  const by = (pred) => {
+    const v = getNutrientVal(f, pred);
+    return typeof v === "number" ? v : null;
+  };
+
+  // Protein (g): id 1003, number "203", name "protein"
+  let protein = by((r) => r.id === 1003 || r.num === "203" || r.name === "protein");
+  // If Protein missing, infer from Nitrogen (id 1002, number "202") × 6.25
+  if (protein == null) {
+    const nitrogen = by((r) => r.id === 1002 || r.num === "202" || r.name === "nitrogen");
+    if (typeof nitrogen === "number") protein = nitrogen * 6.25;
+  }
+
+  // Total fat (g): id 1004 or "total fat (nlea)" id 1085/number "298"
+  let fat = by((r) => r.id === 1004 || r.num === "204" || r.name === "total lipid (fat)" || r.name === "total fat (nlea)");
+  if (fat == null) {
+    fat = by((r) => r.id === 1085 || r.num === "298"); // NLEA
+  }
+
+  // Carbohydrate by difference (g): id 1005 / number "205"
+  const carbs = by((r) => r.id === 1005 || r.num === "205" || r.name === "carbohydrate, by difference");
+
+  // Alcohol (g): id 1006 / number "221"
+  const alcohol = by((r) => r.id === 1006 || r.num === "221" || r.name === "alcohol, ethyl");
+
+  // If we don't have at least fat+carb+protein (or any two), skip
+  const p = typeof protein === "number" ? protein : 0;
+  const fval = typeof fat === "number" ? fat : 0;
+  const c = typeof carbs === "number" ? carbs : 0;
+  const alc = typeof alcohol === "number" ? alcohol : 0;
+
+  const haveAny = p > 0 || fval > 0 || c > 0 || alc > 0;
+  if (!haveAny) return 0;
+
+  const kcal = (p * 4) + (fval * 9) + (c * 4) + (alc * 7);
+  return Math.round(kcal);
+}
+
+// Decide row calories + what they are "per"
+function listRowCaloriesAndPer(f) {
+  // Branded → labelNutrients per serving
+  const ln = f?.labelNutrients;
+  const labelCals = ln?.calories?.value;
+  if (typeof labelCals === "number" && labelCals > 0) {
     const size = Number(f?.servingSize);
-    const unit = String(f?.servingSizeUnit || "").toLowerCase();
-
-    if (energyPer100g > 0 && size > 0 && unit === "g") {
-      return { calories: Math.round(energyPer100g * (size / 100)) };
-    }
-
-    if (energyPer100g > 0) return { calories: Math.round(energyPer100g) };
-    return { calories: 0 };
-  } catch {
-    return { calories: 0 };
-  }
-}
-
-// Human-friendly serving text; falls back to "serving"
-function safeServingText(f) {
-  try {
-    const sizeRaw = f?.servingSize;
     const unit = String(f?.servingSizeUnit || "").trim();
-    const size = typeof sizeRaw === "number" ? sizeRaw : Number(sizeRaw);
+    const per = Number.isFinite(size) && size > 0 ? `${cleanNum(size)} ${unit || ""}`.trim() : "serving";
+    return { calories: Math.round(labelCals), per };
+  }
+
+  // Foundation/SR → prefer direct energy; else compute from macros
+  let energyPer100g = energyKcalFromAny(f);
+  if (energyPer100g <= 0) {
+    energyPer100g = energyKcalFromMacros(f);
+  }
+
+  const size = Number(f?.servingSize);
+  const unit = String(f?.servingSizeUnit || "").trim().toLowerCase();
+
+  if (energyPer100g > 0 && Number.isFinite(size) && size > 0 && unit === "g") {
+    return { calories: Math.round(energyPer100g * (size / 100)), per: `${cleanNum(size)} g` };
+  }
+
+  if (energyPer100g > 0) return { calories: Math.round(energyPer100g), per: "100 g" };
+
+  // Unknown energy — still default per to 100 g for non-branded display
+  return { calories: 0, per: "100 g" };
+}
+
+function servingTextForDisplay(f, fallbackPer) {
+  try {
+    const size = Number(f?.servingSize);
+    const unit = String(f?.servingSizeUnit || "").trim();
     if (Number.isFinite(size) && size > 0) {
-      const sizeStr = Number.isInteger(size) ? String(size) : size.toFixed(1);
-      return unit ? `${sizeStr} ${unit}` : sizeStr;
+      return unit ? `${cleanNum(size)} ${unit}` : `${cleanNum(size)}`;
     }
-    if (f?.householdServingFullText) {
-      const t = String(f.householdServingFullText).trim();
-      if (t) return t;
-    }
+    const t = String(f?.householdServingFullText || "").trim();
+    if (t) return t;
     const p0 = Array.isArray(f?.foodPortions) ? f.foodPortions[0] : null;
-    if (p0?.gramWeight) return `${p0.gramWeight} g`;
-    return unit || "serving";
+    if (p0?.gramWeight) return `${cleanNum(p0.gramWeight)} g`;
+    return fallbackPer || "100 g"; // sensible default for Foundation/SR
   } catch {
-    return "serving";
+    return fallbackPer || "100 g";
   }
 }
 
-// Normalize nutrients (detail + labelNutrients) → [{name,value,unit}]
+function cleanNum(n) {
+  return Number.isInteger(n) ? String(n) : Number(n).toFixed(1);
+}
+
+/* ---------------------- Normalize detail → table rows ---------------------- */
+
 function normalizedNutrients(detail = {}) {
   const out = [];
 
@@ -254,10 +350,7 @@ function normalizedNutrients(detail = {}) {
     };
     for (const [key, val] of Object.entries(ln)) {
       if (!keyToName[key]) continue;
-      const v =
-        val && typeof val === "object" && typeof val.value === "number"
-          ? val.value
-          : null;
+      const v = val && typeof val === "object" && typeof val.value === "number" ? val.value : null;
       if (v == null) continue;
       out.push({
         name: keyToName[key],
