@@ -10,13 +10,19 @@ router.post("/analyze", async (req, res) => {
     if (!image_base64) return res.status(400).json({ error: "image_base64 required" });
 
     const system = `
-You are a nutrition expert. Identify foods visible in the image.
+You are a nutrition expert analyzing a meal. Identify ALL individual ingredients visible in the image.
 Return ONLY JSON: {"items":[{"name":string,"portion_desc":string,"portion_grams":number}]}
+
 Rules:
-- Portion grams must be your best estimate in grams.
-- portion_desc is human-friendly, e.g., "1 cup", "150 g", "1 medium piece".
-- Deduplicate by lowercased name.
-- 1–8 items typical.
+- Identify individual ingredients, not just "meal" names (e.g., "chicken breast", "brown rice", "broccoli" not just "stir fry")
+- Portion grams must be your best estimate in grams for each ingredient
+- portion_desc is human-friendly, e.g., "1 cup", "150 g", "1 medium piece"
+- Be specific with ingredient names for USDA lookup (e.g., "chicken breast" not "chicken", "brown rice" not "rice")
+- Estimate realistic portions based on what's visible
+- Deduplicate by lowercased name
+- 2-12 ingredients typical for a meal
+- Include cooking oils, sauces, seasonings if visible
+- For mixed dishes, break down into components
 `;
 
     const userText = `Analyze this photo. Only output the strict JSON object described.`;

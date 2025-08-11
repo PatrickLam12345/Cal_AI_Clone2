@@ -14,15 +14,14 @@ router.get("/search", async (req, res) => {
     if (!q) return res.json({ foods: [], page: 1, pageSize, totalHits: 0 });
 
     // Try Foundation first
-    const foundation = await searchRaw(q, { page, dataType: "Foundation", pageSize, sortBy: "relevance",
-    });
+    const foundation = await searchRaw(q, { page, dataType: "Foundation", pageSize });
     let foods = Array.isArray(foundation.foods) ? foundation.foods : [];
     let totalHits =
       typeof foundation.totalHits === "number" ? foundation.totalHits : (foods.length || 0);
 
     // Fallback to SR Legacy if Foundation empty
     if (foods.length === 0) {
-      const legacy = await searchRaw(q, { page, dataType: "SR Legacy", pageSize, sortBy: "relevance" });
+      const legacy = await searchRaw(q, { page, dataType: "SR Legacy", pageSize });
       foods = Array.isArray(legacy.foods) ? legacy.foods : [];
       totalHits =
         typeof legacy.totalHits === "number" ? legacy.totalHits : (foods.length || 0);
@@ -120,14 +119,13 @@ async function fetchJson(url, opts = {}, ms = 8000) {
   }
 }
 
-async function searchRaw(query, { page = 1, dataType, pageSize = 25, sortBy } = {}) {
+async function searchRaw(query, { page = 1, dataType, pageSize = 25 } = {}) {
   const url = new URL(`${BASE}/foods/search`);
   url.searchParams.set("api_key", USDA_API_KEY);
   url.searchParams.set("query", query);
   url.searchParams.set("pageNumber", String(page));
   url.searchParams.set("pageSize", String(pageSize));
   if (dataType) url.searchParams.set("dataType", dataType);
-  if (sortBy) url.searchParams.set("sortBy", sortBy);
 
   const r = await fetchJson(url);
   if (!r.ok) throw new Error(`USDA search failed: ${r.status}`);
