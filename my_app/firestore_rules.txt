@@ -1,0 +1,24 @@
+// Updated Firestore Security Rules for Cal_AI
+// Copy this to your Firebase Console > Firestore > Rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User profiles - only readable/writable by the user
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Today's detailed food log entries - only readable/writable by the user
+    match /food_log_entries/{document} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+    
+    // Historical daily nutrition summaries - only readable/writable by the user
+    match /daily_nutrition_summaries/{document} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+  }
+}
