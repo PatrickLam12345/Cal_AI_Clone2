@@ -9,18 +9,54 @@
       "client_info": {
         "mobilesdk_app_id": "1:380605215705:android:798e914cd007de4a16dfc8",
         "android_client_info": {
-          "package_name": "com.example.my_app"
+          "package_name": "com.pati.pati"
         }
       },
       "oauth_client": [
         {
-          "client_id": "380605215705-seimpaigf66ka8pvhtltpa6pom1ku66f.apps.googleusercontent.com",
+          "client_id": "380605215705-2u5tq3jvmrimnk9b3vg2ocbq6aq5hu8o.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.my_app",
-            "certificate_hash": "d0957f382dda0483c57720cdf96bc25f28eb38b1"
+            "package_name": "com.pati.pati",
+            "certificate_hash": "44d3ff3b2c2a417246a02c61da943e3cdc3ab668"
           }
         },
+        {
+          "client_id": "380605215705-htt8b7qpfa8smiftc3ctcvqp45uvck9d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSkXA-ZNdcuxPUOqhDvuS2W0gvLeZ-DvM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "380605215705-8d134bjt2tttv8u17qctq1as617d6rh7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "380605215705-o91q8g3826upvugs77beqji7c4ggsdk8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.myApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:380605215705:android:6f456b0452440bcc16dfc8",
+        "android_client_info": {
+          "package_name": "com.pati.pati"
+        }
+      },
+      "oauth_client": [
         {
           "client_id": "380605215705-htt8b7qpfa8smiftc3ctcvqp45uvck9d.apps.googleusercontent.com",
           "client_type": 3
