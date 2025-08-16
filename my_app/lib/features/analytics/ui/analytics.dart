@@ -425,12 +425,15 @@ class _AnalyticsData {
     final String goal = (data['goal'] as String? ?? 'maintain').toLowerCase();
     final String activity = (data['activity'] as String? ?? 'moderate').toLowerCase();
     
-    // Calculate target weight based on goal
-    double targetWeightKg = currentWeightKg;
-    if (goal == 'lose') {
-      targetWeightKg = currentWeightKg * 0.9; // 10% weight loss target
-    } else if (goal == 'gain') {
-      targetWeightKg = currentWeightKg * 1.1; // 10% weight gain target
+    // Prefer explicit target from Firestore; fall back to computed per goal
+    double targetWeightKg = (data['target_weight_kg'] as num?)?.toDouble() ?? 0.0;
+    if (targetWeightKg <= 0) {
+      targetWeightKg = currentWeightKg;
+      if (goal == 'lose') {
+        targetWeightKg = currentWeightKg * 0.9; // default: lose 10%
+      } else if (goal == 'gain') {
+        targetWeightKg = currentWeightKg * 1.1; // default: gain 10%
+      }
     }
 
     // Calculate BMI
@@ -439,14 +442,16 @@ class _AnalyticsData {
 
     // Weight difference
     final double weightDifferenceKg = targetWeightKg - currentWeightKg;
-    final String weightDifferenceText = weightDifferenceKg >= 0 
-        ? '${weightDifferenceKg >= 0 ? 'Gain' : 'Lose'} needed'
+    final String weightDifferenceText = weightDifferenceKg >= 0
+        ? '${weightDifferenceKg.toStringAsFixed(1)} kg to gain'
         : '${weightDifferenceKg.abs().toStringAsFixed(1)} kg to lose';
 
     // Progress calculations
-    final double weightProgress = goal == 'maintain' ? 1.0 : 
-        (goal == 'lose' ? (currentWeightKg - targetWeightKg) / (currentWeightKg * 0.1) : 
-                         (targetWeightKg - currentWeightKg) / (currentWeightKg * 0.1));
+    final double weightProgress = goal == 'maintain'
+        ? 1.0
+        : (goal == 'lose'
+            ? (currentWeightKg - targetWeightKg) / (currentWeightKg * 0.1)
+            : (targetWeightKg - currentWeightKg) / (currentWeightKg * 0.1));
 
     // BMI category and color
     String bmiCategory;
