@@ -37,22 +37,20 @@ android {
         multiDexEnabled = true
     }
 
-  // signingConfigs {
-    //     create("release") {
-    //         if (keystorePropertiesFile.exists()) {
-    //             storeFile = file(keystoreProperties["storeFile"] as String)
-    //             storePassword = keystoreProperties["storePassword"] as String
-    //             keyAlias = keystoreProperties["keyAlias"] as String
-    //             keyPassword = keystoreProperties["keyPassword"] as String
-    //         }
-    //     }
-    // }
+    signingConfigs {
+        create("release") {
+            storeFile = file("release-keystore.jks")
+            storePassword = "android123"
+            keyAlias = "upload"
+            keyPassword = "android123"
+        }
+    }
     buildTypes {
         getByName("release") {
             // Enable both minification and resource shrinking for optimal APK size
             isMinifyEnabled = true
             isShrinkResources = true
-            // signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
