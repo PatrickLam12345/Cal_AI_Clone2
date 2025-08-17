@@ -1,6 +1,7 @@
 // lib/services/usda_api.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_base.dart';
 
 class UsdaSearchResponse {
   final List<Map<String, dynamic>> foods;
@@ -17,12 +18,12 @@ class UsdaSearchResponse {
 }
 
 class UsdaApi {
-  final String base; // change to http://localhost:3000 for desktop
-  const UsdaApi({this.base = 'http://10.0.2.2:3000'});
+  const UsdaApi();
 
   static const _timeout = Duration(seconds: 12);
 
   Future<UsdaSearchResponse> search(String q, {int page = 1}) async {
+    final base = await apiBaseUrl();
     final uri = Uri.parse('$base/usda/search')
         .replace(queryParameters: {'q': q, 'page': '$page'});
 
@@ -45,6 +46,7 @@ class UsdaApi {
   }
 
   Future<Map<String, dynamic>> detail(int fdcId) async {
+    final base = await apiBaseUrl();
     final uri = Uri.parse('$base/usda/detail/$fdcId');
     final resp = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(_timeout);
     if (resp.statusCode != 200) {
@@ -56,6 +58,7 @@ class UsdaApi {
   }
 
   Future<List<Map<String, dynamic>>> normalize(Map<String, dynamic> detail) async {
+    final base = await apiBaseUrl();
     final uri = Uri.parse('$base/usda/normalize');
     final resp = await http
         .post(uri,

@@ -8,7 +8,7 @@ const String _lanIp = '192.168.0.123';
 
 // Your dev machine's LAN IP
 const int _port = 3000;
-const String _prodUrl = 'https://api.myapp.com'; // Your live API endpoint
+const String _prodUrl = 'https://us-central1-cal-ai-clone-e57ea.cloudfunctions.net/api'; // Firebase Functions endpoint
 
 /// Get the correct API base URL depending on environment
 Future<String> apiBaseUrl() async {

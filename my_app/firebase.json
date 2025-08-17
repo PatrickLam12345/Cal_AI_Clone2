@@ -3,6 +3,9 @@
     "rules": "firestore_rules.txt",
     "indexes": "firestore.indexes.json"
   },
+  "functions": {
+    "source": "functions"
+  },
   "flutter": {
     "platforms": {
       "android": {
