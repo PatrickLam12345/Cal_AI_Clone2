@@ -50,6 +50,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "380605215705-nihsbg1j415pop574l2hok8kfr0i1jar.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pati.pati",
+            "certificate_hash": "b54a536c2d41190824d812f9ad0b2f2e0c759e9d"
+          }
+        },
+        {
           "client_id": "380605215705-rs28as71ae13dcu5hl7p24p17c3g1efd.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

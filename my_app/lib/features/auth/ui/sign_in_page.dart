@@ -5,8 +5,11 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../nav/ui/main_nav_page.dart';
 
 enum UnitSystem { metric, imperial }
+
 enum Sex { male, female }
+
 enum ActivityLevel { sedentary, light, moderate, active, veryActive }
+
 enum Goal { lose, maintain, gain }
 
 class ProfilePayload {
@@ -289,8 +292,9 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
         }
 
         // Speed slider (positive-only display; sign applied on save)
-        final speedDisplay =
-            units == 'metric' ? rateKgPerWeekMag : rateKgPerWeekMag * 2.2046226218;
+        final speedDisplay = units == 'metric'
+            ? rateKgPerWeekMag
+            : rateKgPerWeekMag * 2.2046226218;
         final speedMin = 0.0;
         final speedMax = (units == 'metric' ? 1.5 : 1.5 * 2.2046226218);
 
@@ -313,7 +317,8 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                     SegmentedButton<String>(
                       segments: const [
                         ButtonSegment(value: 'metric', label: Text('Metric')),
-                        ButtonSegment(value: 'imperial', label: Text('Imperial')),
+                        ButtonSegment(
+                            value: 'imperial', label: Text('Imperial')),
                       ],
                       selected: {units},
                       onSelectionChanged: (s) => switchUnits(s.first),
@@ -331,7 +336,8 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                         decoration: const InputDecoration(labelText: 'Sex'),
                         items: const [
                           DropdownMenuItem(value: 'male', child: Text('Male')),
-                          DropdownMenuItem(value: 'female', child: Text('Female')),
+                          DropdownMenuItem(
+                              value: 'female', child: Text('Female')),
                         ],
                         onChanged: (v) => setLocal(() => sex = v ?? 'male'),
                       ),
@@ -361,7 +367,8 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                     keyboardType: TextInputType.number,
                     onChanged: (v) {
                       final n = double.tryParse(v);
-                      if (n != null) setLocal(() => heightCm = n.clamp(120, 250));
+                      if (n != null)
+                        setLocal(() => heightCm = n.clamp(120, 250));
                     },
                   )
                 else
@@ -376,7 +383,8 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                           onChanged: (v) {
                             final ft = int.tryParse(v) ?? 0;
                             final inches = heightCm / 2.54 % 12;
-                            setLocal(() => heightCm = (ft * 12 + inches) * 2.54);
+                            setLocal(
+                                () => heightCm = (ft * 12 + inches) * 2.54);
                           },
                         ),
                       ),
@@ -419,13 +427,17 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                 // Activity
                 DropdownButtonFormField<String>(
                   value: activity,
-                  decoration: const InputDecoration(labelText: 'Activity level'),
+                  decoration:
+                      const InputDecoration(labelText: 'Activity level'),
                   items: const [
-                    DropdownMenuItem(value: 'sedentary', child: Text('Sedentary')),
+                    DropdownMenuItem(
+                        value: 'sedentary', child: Text('Sedentary')),
                     DropdownMenuItem(value: 'light', child: Text('Light')),
-                    DropdownMenuItem(value: 'moderate', child: Text('Moderate')),
+                    DropdownMenuItem(
+                        value: 'moderate', child: Text('Moderate')),
                     DropdownMenuItem(value: 'active', child: Text('Active')),
-                    DropdownMenuItem(value: 'veryactive', child: Text('Very active')),
+                    DropdownMenuItem(
+                        value: 'veryactive', child: Text('Very active')),
                   ],
                   onChanged: (v) => setLocal(() => activity = v ?? 'moderate'),
                 ),
@@ -437,7 +449,8 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                   decoration: const InputDecoration(labelText: 'Goal'),
                   items: const [
                     DropdownMenuItem(value: 'lose', child: Text('Lose weight')),
-                    DropdownMenuItem(value: 'maintain', child: Text('Maintain')),
+                    DropdownMenuItem(
+                        value: 'maintain', child: Text('Maintain')),
                     DropdownMenuItem(value: 'gain', child: Text('Gain weight')),
                   ],
                   onChanged: (v) {
@@ -572,8 +585,10 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _kv('Account',
-                      FirebaseAuth.instance.currentUser?.email ?? 'Google Account'),
+                  _kv(
+                      'Account',
+                      FirebaseAuth.instance.currentUser?.email ??
+                          'Google Account'),
                   _kv('Units', isMetric ? 'Metric' : 'Imperial'),
                   _kv('Sex', _sex.name),
                   _kv('Age', '$_age'),
@@ -632,8 +647,10 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                         'age': _age,
                         'height_cm': _heightCm,
                         'weight_kg': _weightKg,
-                        'activity': _activityToString(_activity), // 'veryactive'
-                        'goal': _goalToString(_goal), // 'lose'|'maintain'|'gain'
+                        'activity':
+                            _activityToString(_activity), // 'veryactive'
+                        'goal':
+                            _goalToString(_goal), // 'lose'|'maintain'|'gain'
                         'target_weight_kg': _targetWeightKg,
                         'rate_kg_per_week': _rateKgPerWeek,
                         'created_at': FieldValue.serverTimestamp(),
