@@ -191,21 +191,35 @@ class AnalyticsPage extends StatelessWidget {
       final currentWeightKg = isImperial ? currentInput / 2.2046226218 : currentInput;
       final targetWeightKg = isImperial ? targetInput / 2.2046226218 : targetInput;
       
+      // Auto-sync goal based on current vs target weight relationship
+      String goal;
+      final diff = targetWeightKg - currentWeightKg;
+      if (diff.abs() < 1e-6) {
+        goal = 'maintain';
+      } else if (diff > 0) {
+        goal = 'gain';
+      } else {
+        goal = 'lose';
+      }
+      
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
       
-      // Update in Firestore
+      // Update in Firestore (including auto-synced goal)
       await FirebaseFirestore.instance.collection('users').doc(uid).update({
         'weight_kg': currentWeightKg,
         'target_weight_kg': targetWeightKg,
+        'goal': goal, // Auto-synced goal based on weight relationship
       });
       
       Navigator.of(context).pop();
       
-      // Show success message
+      // Show success message with auto-synced goal
+      final goalText = goal == 'maintain' ? 'Maintain weight' : 
+                      goal == 'gain' ? 'Gain weight' : 'Lose weight';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Weight updated successfully!'),
+        SnackBar(
+          content: Text('Weight updated successfully!\nGoal set to: $goalText'),
           backgroundColor: Colors.green,
         ),
       );
