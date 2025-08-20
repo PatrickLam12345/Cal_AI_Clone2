@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../analytics/data/analytics_service.dart';
 import '../../services/timezone_service.dart';
+import '../../food_log/ui/ingredient_breakdown_sheet.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -253,101 +254,111 @@ class _HomePageState extends State<HomePage> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            // Meal image or icon
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[200],
-              ),
-              child: imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            source == 'scan' ? Icons.camera_alt : Icons.search,
-                            color: Colors.grey[400],
-                            size: 24,
-                          );
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                value: loadingProgress.expectedTotalBytes !=
-                                        null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
+      child: InkWell(
+        onTap: () => showIngredientBreakdown(context, mealData),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Meal image or icon
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[200],
+                ),
+                child: imageUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              source == 'scan' ? Icons.camera_alt : Icons.search,
+                              color: Colors.grey[400],
+                              size: 24,
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  value: loadingProgress.expectedTotalBytes !=
+                                          null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    )
-                  : Icon(
-                      source == 'scan' ? Icons.camera_alt : Icons.search,
-                      size: 24,
-                      color: source == 'scan' ? Colors.green : Colors.blue,
-                    ),
-            ),
-            const SizedBox(width: 12),
-
-            // Meal details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                            );
+                          },
                         ),
+                      )
+                    : Icon(
+                        source == 'scan' ? Icons.camera_alt : Icons.search,
+                        size: 24,
+                        color: source == 'scan' ? Colors.green : Colors.blue,
                       ),
-                      Text(
-                        timeText,
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        '${calories.toStringAsFixed(0)} kcal',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.orange),
-                      ),
-                      const SizedBox(width: 12),
-                      Text('P: ${protein.toStringAsFixed(0)}g',
-                          style: const TextStyle(fontSize: 11)),
-                      const SizedBox(width: 6),
-                      Text('C: ${carbs.toStringAsFixed(0)}g',
-                          style: const TextStyle(fontSize: 11)),
-                      const SizedBox(width: 6),
-                      Text('F: ${fat.toStringAsFixed(0)}g',
-                          style: const TextStyle(fontSize: 11)),
-                    ],
-                  ),
-                ],
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+
+              // Meal details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Text(
+                          timeText,
+                          style:
+                              const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          '${calories.toStringAsFixed(0)} kcal',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.orange),
+                        ),
+                        const SizedBox(width: 12),
+                        Text('P: ${protein.toStringAsFixed(0)}g',
+                            style: const TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.w500)),
+                        const SizedBox(width: 6),
+                        Text('C: ${carbs.toStringAsFixed(0)}g',
+                            style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w500)),
+                        const SizedBox(width: 6),
+                        Text('F: ${fat.toStringAsFixed(0)}g',
+                            style: const TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Click indicator
+              const Icon(
+                Icons.chevron_right,
+                color: Colors.grey,
+              ),
+            ],
+          ),
         ),
       ),
     );

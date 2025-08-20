@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/timezone_service.dart';
+import 'ingredient_breakdown_sheet.dart';
 
 class FoodLogPage extends StatelessWidget {
   const FoodLogPage({super.key});
@@ -51,10 +52,69 @@ class FoodLogPage extends StatelessWidget {
               final p = (d['protein_g'] as num?)?.toDouble() ?? 0;
               final c = (d['carb_g'] as num?)?.toDouble() ?? 0;
               final f = (d['fat_g'] as num?)?.toDouble() ?? 0;
+              final source = d['source'] as String? ?? 'manual';
+              final imageUrl = d['image_url'] as String?;
+              
               return ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    color: Colors.grey[200],
+                  ),
+                  child: imageUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                source == 'scan' ? Icons.camera_alt : Icons.search,
+                                color: Colors.grey[400],
+                                size: 16,
+                              );
+                            },
+                          ),
+                        )
+                      : Icon(
+                          source == 'scan' ? Icons.camera_alt : Icons.search,
+                          size: 16,
+                          color: source == 'scan' ? Colors.green : Colors.blue,
+                        ),
+                ),
                 title: Text(name),
-                subtitle: Text('P ${p.toStringAsFixed(0)}g · C ${c.toStringAsFixed(0)}g · F ${f.toStringAsFixed(0)}g'),
-                trailing: Text('${kcal.toStringAsFixed(0)} kcal'),
+                subtitle: RichText(
+                  text: TextSpan(
+                    style: DefaultTextStyle.of(context).style,
+                    children: [
+                      TextSpan(
+                        text: 'P ${p.toStringAsFixed(0)}g',
+                        style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w500),
+                      ),
+                      const TextSpan(text: ' · '),
+                      TextSpan(
+                        text: 'C ${c.toStringAsFixed(0)}g',
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500),
+                      ),
+                      const TextSpan(text: ' · '),
+                      TextSpan(
+                        text: 'F ${f.toStringAsFixed(0)}g',
+                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('${kcal.toStringAsFixed(0)} kcal'),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right, color: Colors.grey),
+                  ],
+                ),
+                onTap: () => showIngredientBreakdown(context, d),
               );
             },
           );

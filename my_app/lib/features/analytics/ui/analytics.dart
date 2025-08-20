@@ -297,49 +297,56 @@ class AnalyticsPage extends StatelessWidget {
       children: [
         Text('BMI Scale', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        Container(
-          height: 24,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(
-              colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
-              stops: [0.0, 0.25, 0.5, 1.0],
-            ),
-          ),
-          child: Stack(
-            children: [
-              // BMI range labels
-              Positioned(
-                left: 8,
-                top: 2,
-                child: Text('18.5', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              Positioned(
-                left: MediaQuery.of(context).size.width * 0.8 * 0.25 - 8,
-                top: 2,
-                child: Text('25', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              Positioned(
-                left: MediaQuery.of(context).size.width * 0.8 * 0.5 - 8,
-                top: 2,
-                child: Text('30', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              // Current BMI indicator
-              Positioned(
-                left: _getBMIPosition(analytics.currentBMI) - 6,
-                top: 0,
-                child: Container(
-                  width: 12,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.black, width: 2),
-                  ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final scaleWidth = constraints.maxWidth;
+            final bmiPosition = _getBMIPosition(analytics.currentBMI, scaleWidth);
+            
+            return Container(
+              height: 24,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
+                  stops: [0.0, 0.25, 0.5, 1.0],
                 ),
               ),
-            ],
-          ),
+              child: Stack(
+                children: [
+                  // BMI range labels - positioned using the same calculation as the indicator
+                  Positioned(
+                    left: (_getBMIPosition(18.5, scaleWidth) - 10).clamp(0.0, scaleWidth - 20),
+                    top: 2,
+                    child: Text('18.5', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  Positioned(
+                    left: (_getBMIPosition(25.0, scaleWidth) - 8).clamp(0.0, scaleWidth - 16),
+                    top: 2,
+                    child: Text('25', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  Positioned(
+                    left: (_getBMIPosition(30.0, scaleWidth) - 8).clamp(0.0, scaleWidth - 16),
+                    top: 2,
+                    child: Text('30', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  // Current BMI indicator
+                  Positioned(
+                    left: (bmiPosition - 6).clamp(0.0, scaleWidth - 12), // Ensure indicator stays within bounds
+                    top: 0,
+                    child: Container(
+                      width: 12,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.black, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
         ),
         const SizedBox(height: 8),
         Row(
@@ -371,12 +378,30 @@ class AnalyticsPage extends StatelessWidget {
     );
   }
 
-  double _getBMIPosition(double bmi) {
-    // Convert BMI to position on scale (0-100%)
-    if (bmi < 18.5) return (bmi / 18.5) * 25;
-    if (bmi < 25) return 25 + ((bmi - 18.5) / 6.5) * 25;
-    if (bmi < 30) return 50 + ((bmi - 25) / 5) * 25;
-    return 75 + ((bmi - 30) / 10) * 25;
+  double _getBMIPosition(double bmi, double scaleWidth) {
+    // Convert BMI to position on scale (0-100% of width)
+    double percentage = 0.0;
+    
+    // Clamp BMI to reasonable range for visualization
+    final clampedBMI = bmi.clamp(10.0, 45.0);
+    
+    // Calculate position as percentage (0.0 to 1.0)
+    if (clampedBMI < 18.5) {
+      // Underweight range: 0% to 25% of scale
+      percentage = (clampedBMI / 18.5) * 0.25;
+    } else if (clampedBMI < 25) {
+      // Healthy range: 25% to 50% of scale
+      percentage = 0.25 + ((clampedBMI - 18.5) / 6.5) * 0.25;
+    } else if (clampedBMI < 30) {
+      // Overweight range: 50% to 75% of scale
+      percentage = 0.5 + ((clampedBMI - 25) / 5.0) * 0.25;
+    } else {
+      // Obese range: 75% to 100% of scale
+      percentage = 0.75 + ((clampedBMI - 30) / 15.0) * 0.25; // Extended range for obese
+    }
+    
+    // Convert percentage to pixel position
+    return percentage * scaleWidth;
   }
 }
 
