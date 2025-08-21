@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import '../../auth/ui/sign_in_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -124,8 +126,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     onPressed: () async {
                       await FirebaseAuth.instance.signOut();
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Signed out')),
+                      
+                      // Navigate to sign-in page
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (context) => const SignupFlowPage(),
+                        ),
+                        (route) => false,
                       );
                     },
                     child: const Text('Log out'),
@@ -164,17 +171,44 @@ class _SettingsPageState extends State<SettingsPage> {
                       try {
                         final user = FirebaseAuth.instance.currentUser!;
                         final uid = user.uid;
+                        
+                        // Show loading dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const AlertDialog(
+                            content: Row(
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(width: 16),
+                                Text('Deleting account and data...'),
+                              ],
+                            ),
+                          ),
+                        );
+                        
+                        // Delete user profile document
                         await _docRef!.delete();
-                        final entries = await FirebaseFirestore.instance
-                            .collection('diary_entries')
-                            .where('uid', isEqualTo: uid)
-                            .limit(200)
-                            .get();
-                        for (final d in entries.docs) {
-                          await d.reference.delete();
-                        }
+                        
+                        // Delete ALL food log entries (not limited to 200)
+                        await _deleteAllUserDocuments('food_log_entries', uid);
+                        
+                        // Delete daily nutrition summaries
+                        await _deleteAllUserDocuments('daily_nutrition_summaries', uid);
+                        
+                        // Delete Firebase Storage images
+                        await _deleteUserImages(uid);
+                        
+                        // Finally delete the Firebase Auth account
                         await user.delete();
+                        
+                        // Close loading dialog
+                        if (mounted) Navigator.of(context).pop();
+                        
                       } on FirebaseAuthException catch (e) {
+                        // Close loading dialog
+                        if (mounted) Navigator.of(context).pop();
+                        
                         if (e.code == 'requires-recent-login') {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -186,13 +220,27 @@ class _SettingsPageState extends State<SettingsPage> {
                           return;
                         }
                         rethrow;
+                      } catch (e) {
+                        // Close loading dialog
+                        if (mounted) Navigator.of(context).pop();
+                        
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error deleting account: $e')),
+                        );
+                        return;
                       } finally {
                         await FirebaseAuth.instance.signOut();
                       }
 
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Account deleted')),
+                      
+                      // Navigate to sign-in page
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (context) => const SignupFlowPage(),
+                        ),
+                        (route) => false,
                       );
                     },
                     child: const Text('Delete account'),
@@ -812,6 +860,59 @@ class _SettingsPageState extends State<SettingsPage> {
     } else {
       final lbsPerWeek = rateKgPerWeek * 2.2046226218;
       return '${lbsPerWeek.toStringAsFixed(2)} lb/week • $arrow';
+    }
+  }
+
+  /// Helper method to delete all documents from a collection for a specific user
+  Future<void> _deleteAllUserDocuments(String collectionName, String uid) async {
+    const int batchSize = 100;
+    bool hasMore = true;
+
+    while (hasMore) {
+      final query = await FirebaseFirestore.instance
+          .collection(collectionName)
+          .where('uid', isEqualTo: uid)
+          .limit(batchSize)
+          .get();
+
+      if (query.docs.isEmpty) {
+        hasMore = false;
+        break;
+      }
+
+      final batch = FirebaseFirestore.instance.batch();
+      for (final doc in query.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      // If we got fewer than batchSize documents, we're done
+      if (query.docs.length < batchSize) {
+        hasMore = false;
+      }
+    }
+  }
+
+  /// Helper method to delete all user images from Firebase Storage
+  Future<void> _deleteUserImages(String uid) async {
+    try {
+      final storageRef = FirebaseStorage.instance.ref().child('meal_images');
+      final listResult = await storageRef.listAll();
+      
+      for (final item in listResult.items) {
+        // Check if the file name contains the user's UID
+        if (item.name.contains('meal_${uid}_')) {
+          try {
+            await item.delete();
+          } catch (e) {
+            // Continue deleting other images even if one fails
+            print('Failed to delete image ${item.name}: $e');
+          }
+        }
+      }
+    } catch (e) {
+      // Don't throw error - image deletion failure shouldn't block account deletion
+      print('Failed to delete user images: $e');
     }
   }
 }
